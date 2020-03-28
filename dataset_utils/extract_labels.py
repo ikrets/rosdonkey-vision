@@ -11,6 +11,8 @@ import json
 from pathlib import Path
 import subprocess
 
+from transform import overlay_img_with_mask
+
 parser = argparse.ArgumentParser(
     description='Extract labeled images from the semantic segmentation editor.'
 )
@@ -118,13 +120,9 @@ for item in tqdm(
 
     img.save(os.path.join(output_dir, 'images', output_filename))
 
-    alpha = 0.5
-    overlayed = np.array(img)
-    overlayed[mask == 1] = (
-        alpha * np.array([0, 255, 0]) + (1 - alpha) * overlayed[mask == 1]
-    ).round()
     cv2.imwrite(
-        os.path.join(output_dir, 'images_with_masks', output_filename), overlayed
+        os.path.join(output_dir, 'images_with_masks', output_filename),
+        overlay_img_with_mask(img, mask),
     )
     cv2.imwrite(
         os.path.join(
