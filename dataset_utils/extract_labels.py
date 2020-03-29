@@ -91,6 +91,7 @@ for item in tqdm(
     image_bytes = BytesIO()
     img.save(image_bytes, format='PNG')
     output_filename = '{}_{}'.format(item['folder'].replace('/', '-'), item['file'])
+    output_filename = output_filename.replace('.jpg', '.png')
 
     labels = requests.get('http://localhost:3000/api/json' + item['url']).json()
     mask = np.zeros(original_img_size[::-1], dtype=np.uint8)
@@ -125,8 +126,5 @@ for item in tqdm(
         overlay_img_with_mask(img, mask),
     )
     cv2.imwrite(
-        os.path.join(
-            output_dir, 'masks', os.path.splitext(output_filename)[0] + '.png'
-        ),
-        mask,
+        os.path.join(output_dir, 'masks', output_filename), mask,
     )

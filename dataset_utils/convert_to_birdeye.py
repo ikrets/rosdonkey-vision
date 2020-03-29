@@ -22,9 +22,9 @@ def prepare_file_dataset(
 ):
     images = []
     for folder in folders:
-        images.extend(glob(os.path.join(folder, 'images/*.jpg')))
+        images.extend(glob(os.path.join(folder, 'images/*.png')))
 
-    masks = [i.replace('images', 'masks').replace('jpg', 'png') for i in images]
+    masks = [i.replace('images', 'masks') for i in images]
     os.makedirs(dataset_name, exist_ok=True)
 
     dataset_path = Path(dataset_name)
