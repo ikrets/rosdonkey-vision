@@ -26,6 +26,7 @@ parser.add_argument('--brightness_delta', type=float, default=0.01)
 parser.add_argument('--contrast_delta', type=float, default=0.01)
 parser.add_argument('--bn_momentum', type=float, default=0.9)
 parser.add_argument('--l2_regularization', type=float, default=0.)
+parser.add_argument('--freeze_encoder', action='store_true')
 parser.add_argument('output_dir', type=str)
 args = parser.parse_args()
 
@@ -120,7 +121,8 @@ def train_and_eval(log_dir, train_filenames, val_filenames=None):
         decoder_filters=decoder_filters,
         alpha=args.alpha,
         bn_momentum=args.bn_momentum,
-        l2_regularization=args.l2_regularization
+        l2_regularization=args.l2_regularization,
+        freeze_encoder=args.freeze_encoder
     )
 
     model.compile(adam, loss=sm.losses.binary_focal_loss, metrics=[binary_iou_score])

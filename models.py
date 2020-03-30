@@ -20,7 +20,8 @@ tf.keras.layers.UpSampling2D = upsampling_bilinear
 num_parallel_calls = 8
 
 
-def unet(input_shape, decoder_filters, alpha, bn_momentum, l2_regularization):
+def unet(input_shape, decoder_filters, alpha, bn_momentum, l2_regularization,
+         freeze_encoder):
     tfk_kwargs = {
         'backend': tf.keras.backend,
         'layers': tf.keras.layers,
@@ -38,6 +39,11 @@ def unet(input_shape, decoder_filters, alpha, bn_momentum, l2_regularization):
         alpha=alpha,
         **tfk_kwargs,
     )
+    if freeze_encoder:
+        for layer in backbone.layers:
+            if not isinstance(layer, tf.keras.layers.BatchNormalization):
+                layer.trainable = False
+
 
     encoder_features = sm.Backbones.get_feature_layers('mobilenetv2', n=4)
     model = sm.models.unet.build_unet(
