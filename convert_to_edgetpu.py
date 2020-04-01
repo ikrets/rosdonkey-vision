@@ -46,7 +46,7 @@ def convert_evaluate_fold(fold_dir, output_dir):
             yield [image]
 
     converter = tf.lite.TFLiteConverter.from_keras_model_file(
-        Path(fold_dir) / 'model.hdf5'
+        Path(fold_dir) / 'model.hdf5', input_shapes={'input_1': [1, 64, 96, 3]},
     )
     converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
     converter.optimizations = [tf.lite.Optimize.DEFAULT]

@@ -12,7 +12,7 @@ from models import unet, MeanIoUFromBinary, VisualizePredsCallback
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data', type=str)
-parser.add_argument('--data_shape', type=int, nargs=2, required=True)
+parser.add_argument('--crop_size', type=int, required=True)
 parser.add_argument('--allowed_tags', type=str, nargs='+', required=True)
 parser.add_argument('--num_folds', type=int, required=True)
 parser.add_argument('--epochs', type=int, required=True)
@@ -45,16 +45,29 @@ def piecewise_linear(values, boundaries):
     return schedule
 
 
-def augment(img, mask, shape, brightness_delta, contrast_delta):
+@tf.function
+def augment(img, mask, crop_size, brightness_delta, contrast_delta):
+    random_crop_h = tf.random.uniform(
+        [1], maxval=tf.shape(img)[0] - crop_size, dtype=tf.int32
+    )[0]
+    random_crop_w = tf.random.uniform(
+        [1], maxval=tf.shape(img)[1] - crop_size, dtype=tf.int32
+    )[0]
+
+    img = tf.image.crop_to_bounding_box(
+        img, random_crop_h, random_crop_w, crop_size, crop_size
+    )
+    mask = tf.image.crop_to_bounding_box(
+        mask, random_crop_h, random_crop_w, crop_size, crop_size
+    )
+
     hflip = tf.random.uniform([1], maxval=2, dtype=tf.int32)[0]
+    if hflip == 1:
+        img, mask = tf.image.flip_left_right(img), tf.image.flip_left_right(mask)
 
-    def flip():
-        return tf.image.flip_left_right(img), tf.image.flip_left_right(mask)
-
-    def noop():
-        return img, mask
-
-    img, mask = tf.cond(tf.equal(hflip, 1), true_fn=flip, false_fn=noop)
+    rot90 = tf.random.uniform([1], maxval=4, dtype=tf.int32)[0]
+    img = tf.image.rot90(img, k=rot90)
+    mask = tf.image.rot90(mask, k=rot90)
 
     img = tf.image.random_brightness(img, max_delta=brightness_delta)
     img = tf.image.random_contrast(img, 1 - contrast_delta, 1 + contrast_delta)
@@ -78,7 +91,7 @@ def train_and_eval(log_dir, train_filenames, val_filenames=None):
         .shuffle(shuffle_buffer_size)
         .map(
             lambda img, mask: augment(
-                img, mask, args.data_shape, args.brightness_delta, args.contrast_delta
+                img, mask, args.crop_size, args.brightness_delta, args.contrast_delta
             ),
             num_parallel_calls,
         )
@@ -119,7 +132,7 @@ def train_and_eval(log_dir, train_filenames, val_filenames=None):
         args.decoder_filters_base * (2 ** i) for i in range(0, args.num_stages)
     ][::-1]
     model = unet(
-        input_shape=[*args.data_shape, 3],
+        input_shape=[None, None, 3],
         decoder_filters=decoder_filters,
         alpha=args.alpha,
         bn_momentum=args.bn_momentum,
