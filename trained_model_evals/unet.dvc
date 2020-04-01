@@ -1,41 +1,36 @@
-md5: 3c913c36107590c879714e84053d0508
+md5: 31a637f16d01acf4ba18feb7f9ab2c1a
 cmd: python convert_to_edgetpu.py trained_models/unet trained_model_evals/unet
 wdir: ..
 deps:
-- md5: a36b52c7769de04dd29733ed0570b143.dir
+- md5: f69ffc5801b6111a782c5f9e2b22117b.dir
   path: trained_models/unet
 outs:
-- md5: 29c5cec95d3033f0f080aed6c2b4f78b.dir
+- md5: 2b621d49dd2d1edd8ffbc2d05a73e5d5.dir
   path: trained_model_evals/unet/fold_0
   cache: true
   metric: false
   persist: false
-- md5: 3201332a703673d2d0fbbbaf9578c449.dir
+- md5: 4958c38fe5a2a26926cee78806f183aa.dir
   path: trained_model_evals/unet/fold_1
   cache: true
   metric: false
   persist: false
-- md5: 96f097dbf2b89165e721729062e2b058.dir
+- md5: ed0070623b001ce10c193e91aaaf5ed2.dir
   path: trained_model_evals/unet/fold_2
   cache: true
   metric: false
   persist: false
-- md5: 28e43ff7ec2c2565935e1f4514a8336b.dir
+- md5: 339a7f20b622397b86ebef578aa8e061.dir
   path: trained_model_evals/unet/fold_3
   cache: true
   metric: false
   persist: false
-- md5: 289513c82c3515b88bc20e0fbc183f83.dir
+- md5: 577d9e3e5ea0e4862c89591337916897.dir
   path: trained_model_evals/unet/fold_4
   cache: true
   metric: false
   persist: false
-- md5: 490bcd51f8262623a2e846fbf53bdfdc.dir
-  path: trained_model_evals/unet/full_train
-  cache: true
-  metric: false
-  persist: false
-- md5: 71b6f5aa8b40b572761a901b9f658d74
+- md5: d7fb542870a0a5598c69e965ca48b024
   path: trained_model_evals/unet/converted_metric.json
   cache: true
   metric: true

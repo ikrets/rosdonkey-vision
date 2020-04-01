@@ -116,12 +116,12 @@ if __name__ == '__main__':
             'w'
         ) as fp:
             json.dump(
-                {'latency': float(latency), 'iou_score': float(iou)}, fp, indent=4,
+                {'latency': float(latency), 'val_mean_io_u': float(iou)}, fp, indent=4,
             )
 
         fold_ious.append(iou)
 
     with (Path(args.output_dir) / 'converted_metric.json').open('w') as fp:
-        json.dump({'iou_score': float(np.mean(fold_ious))}, fp, indent=4)
+        json.dump({'val_mean_io_u': float(np.mean(fold_ious))}, fp, indent=4)
 
     convert_evaluate_fold(Path(args.model_dir) / 'full_train', Path(args.output_dir))
