@@ -1,7 +1,7 @@
 import cv2
 import tensorflow as tf
 from pathlib import Path
-from typing import Iterator, Sequence
+from typing import Sequence
 
 num_parallel_calls = 8
 
@@ -13,7 +13,7 @@ def get_image_filenames(
     return [f for f in filenames if any(a in f.name for a in allowed_tags)]
 
 
-def load(image_filenames: Iterator[Path]) -> tf.data.Dataset:
+def load(image_filenames: Sequence[Path]) -> tf.data.Dataset:
     mask_filenames = [f.parent.parent / 'masks' / f.name for f in image_filenames]
 
     dataset = tf.data.Dataset.from_tensor_slices(

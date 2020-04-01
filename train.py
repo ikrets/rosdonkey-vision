@@ -25,7 +25,7 @@ parser.add_argument('--visualize_preds_period', type=int, default=100)
 parser.add_argument('--brightness_delta', type=float, default=0.01)
 parser.add_argument('--contrast_delta', type=float, default=0.01)
 parser.add_argument('--bn_momentum', type=float, default=0.9)
-parser.add_argument('--l2_regularization', type=float, default=0.)
+parser.add_argument('--l2_regularization', type=float, default=0.0)
 parser.add_argument('--freeze_encoder', action='store_true')
 parser.add_argument('output_dir', type=str)
 args = parser.parse_args()
@@ -122,7 +122,7 @@ def train_and_eval(log_dir, train_filenames, val_filenames=None):
         alpha=args.alpha,
         bn_momentum=args.bn_momentum,
         l2_regularization=args.l2_regularization,
-        freeze_encoder=args.freeze_encoder
+        freeze_encoder=args.freeze_encoder,
     )
 
     model.compile(adam, loss=sm.losses.binary_focal_loss, metrics=[binary_iou_score])
@@ -139,7 +139,9 @@ def train_and_eval(log_dir, train_filenames, val_filenames=None):
     if val_filenames is not None:
         with (log_dir / 'metric.json').open('w') as fp:
             json.dump(
-                {'iou_score': float(history.history['val_binary_iou_score'][-1])}, fp, indent=4
+                {'iou_score': float(history.history['val_binary_iou_score'][-1])},
+                fp,
+                indent=4,
             )
 
     return history
