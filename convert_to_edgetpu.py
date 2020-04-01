@@ -7,9 +7,10 @@ import pandas as pd
 from edgetpu.basic.basic_engine import BasicEngine
 from time import time
 import subprocess
+from PIL import Image
 
 from dataset import get_image_filenames, load
-from models import binary_iou_score
+from models import MeanIoUFromBinary, visualize_preds
 
 
 class SegmentationEngine(BasicEngine):
@@ -38,13 +39,10 @@ def convert_evaluate_fold(fold_dir, output_dir):
     else:
         val_filenames = None
 
-    train_dataset = load([Path(f) for f in train_filenames]).batch(1)
-    sess = tf.keras.backend.get_session()
-    item = tf.compat.v1.data.make_one_shot_iterator(train_dataset).get_next()
-    images = [sess.run(item)[0] for _ in range(len(train_filenames))]
+    train_dataset = load([Path(f) for f in train_filenames]).shuffle(200).batch(1)
 
     def train_images():
-        for image in images:
+        for image, _ in train_dataset:
             yield [image]
 
     converter = tf.lite.TFLiteConverter.from_keras_model_file(
@@ -68,32 +66,38 @@ def convert_evaluate_fold(fold_dir, output_dir):
     )
 
     if val_filenames is not None:
-        sess = tf.keras.backend.get_session()
         segmentation_engine = SegmentationEngine(
             output_dir / fold_dir.name / 'converted_model_edgetpu.tflite'
         )
         val_dataset = load([Path(f) for f in val_filenames]).batch(1)
-        item = tf.compat.v1.data.make_one_shot_iterator(val_dataset).get_next()
 
         latencies = []
+        images = []
         labels = []
         preds = []
-        for _ in range(len(val_filenames)):
-            image, label = sess.run(item)
-            image = (image * 255).astype(np.uint8)
-            latency, pred = segmentation_engine.segment(image)
-            labels.append(label[0])
+
+        mean_iou = MeanIoUFromBinary()
+
+        for image, label in val_dataset:
+            images.append(image.numpy())
+            latency, pred = segmentation_engine.segment(
+                (image.numpy() * 255).astype(np.uint8)
+            )
+            labels.append(label.numpy())
             # important to copy, as pred will be overwritten on every inference!
             preds.append(pred.copy())
             latencies.append(latency)
 
-        iou = sess.run(
-            binary_iou_score(
-                np.stack(labels, axis=0).astype(np.float32), np.stack(preds, axis=0)
-            )
-        )
+            mean_iou.update_state(label, pred.copy()[tf.newaxis, ...])
 
-        return np.mean(latencies), iou
+        result_vis = visualize_preds(
+            images=np.concatenate(images, axis=0),
+            labels=np.concatenate(labels, axis=0),
+            preds=np.stack(preds, axis=0),
+        )
+        Image.fromarray(result_vis).save(output_dir / fold_dir.name / 'val_preds.png')
+
+        return np.mean(latencies), mean_iou.result().numpy()
 
 
 if __name__ == '__main__':
@@ -101,6 +105,8 @@ if __name__ == '__main__':
     parser.add_argument('model_dir', type=str)
     parser.add_argument('output_dir', type=str)
     args = parser.parse_args()
+
+    tf.enable_eager_execution()
 
     folds = Path(args.model_dir).glob('fold_*')
     fold_ious = []

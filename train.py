@@ -8,7 +8,7 @@ import math
 import json
 
 from dataset import get_image_filenames, load
-from models import unet, binary_iou_score, VisualizePredsCallback
+from models import unet, MeanIoUFromBinary, VisualizePredsCallback
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data', type=str)
@@ -17,6 +17,7 @@ parser.add_argument('--allowed_tags', type=str, nargs='+', required=True)
 parser.add_argument('--num_folds', type=int, required=True)
 parser.add_argument('--epochs', type=int, required=True)
 parser.add_argument('--decoder_filters_base', type=int, required=True)
+parser.add_argument('--num_stages', type=int, choices=[2, 3, 4, 5], required=True)
 parser.add_argument('--alpha', choices=[0.35, 0.5, 0.75, 1], type=float)
 parser.add_argument('--lr_values', type=float, nargs='+', required=True)
 parser.add_argument('--lr_boundaries', type=float, nargs='+', required=True)
@@ -97,7 +98,7 @@ def train_and_eval(log_dir, train_filenames, val_filenames=None):
     callbacks = [
         VisualizePredsCallback(
             log_dir=str(log_dir / 'train_images'),
-            data=load(train_filenames).shuffle(shuffle_buffer_size).batch(8).take(1),
+            data=load(train_filenames).shuffle(shuffle_buffer_size).batch(16).take(1),
             period=args.visualize_preds_period,
         ),
         tf.keras.callbacks.LearningRateScheduler(schedule, verbose=1),
@@ -108,14 +109,15 @@ def train_and_eval(log_dir, train_filenames, val_filenames=None):
         callbacks.append(
             VisualizePredsCallback(
                 log_dir=str(log_dir / 'val_images'),
-                data=load(val_filenames).shuffle(shuffle_buffer_size).batch(8).take(1),
+                data=load(val_filenames).shuffle(shuffle_buffer_size).batch(16).take(1),
                 period=args.visualize_preds_period,
             )
         )
 
     adam = tf.keras.optimizers.Adam(0.0)
-    adam = tf.train.experimental.enable_mixed_precision_graph_rewrite(adam)
-    decoder_filters = [args.decoder_filters_base * (2 ** i) for i in range(4, -1, -1)]
+    decoder_filters = [
+        args.decoder_filters_base * (2 ** i) for i in range(0, args.num_stages)
+    ][::-1]
     model = unet(
         input_shape=[*args.data_shape, 3],
         decoder_filters=decoder_filters,
@@ -125,7 +127,9 @@ def train_and_eval(log_dir, train_filenames, val_filenames=None):
         freeze_encoder=args.freeze_encoder,
     )
 
-    model.compile(adam, loss=sm.losses.binary_focal_loss, metrics=[binary_iou_score])
+    model.compile(
+        adam, loss=sm.losses.binary_focal_loss, metrics=[MeanIoUFromBinary()],
+    )
     history = model.fit(
         train_dataset,
         steps_per_epoch=train_steps,
@@ -139,7 +143,7 @@ def train_and_eval(log_dir, train_filenames, val_filenames=None):
     if val_filenames is not None:
         with (log_dir / 'metric.json').open('w') as fp:
             json.dump(
-                {'iou_score': float(history.history['val_binary_iou_score'][-1])},
+                {'val_mean_io_u': float(history.history['val_mean_io_u'][-1])},
                 fp,
                 indent=4,
             )
@@ -159,9 +163,9 @@ for i, train_val_indices in enumerate(kf.split(filenames)):
     history = train_and_eval(
         Path(args.output_dir) / f'fold_{i}', train_filenames, val_filenames
     )
-    ious.append(history.history['val_binary_iou_score'][-1])
+    ious.append(history.history['val_mean_io_u'][-1])
 
 with (Path(args.output_dir) / 'metric.json').open('w') as fp:
-    json.dump({'iou_score': float(np.mean(ious))}, fp)
+    json.dump({'val_mean_io_u': float(np.mean(ious))}, fp)
 
 train_and_eval(Path(args.output_dir) / 'full_train', filenames)

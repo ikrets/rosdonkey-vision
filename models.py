@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-import cv2
+from PIL import Image
 import segmentation_models as sm
 from pathlib import Path
 import math
@@ -22,7 +22,7 @@ num_parallel_calls = 8
 
 
 def unet(
-    input_shape, decoder_filters, alpha, bn_momentum, l2_regularization, freeze_encoder
+    input_shape, decoder_filters, alpha, bn_momentum, l2_regularization, freeze_encoder,
 ):
     tfk_kwargs = {
         'backend': tf.keras.backend,
@@ -47,14 +47,21 @@ def unet(
                 layer.trainable = False
 
     encoder_features = sm.Backbones.get_feature_layers('mobilenetv2', n=4)
+    num_stages = len(decoder_filters)
+    if num_stages < 5:
+        backbone = tf.keras.Model(
+            inputs=backbone.input,
+            outputs=backbone.get_layer(name=encoder_features[4 - num_stages]).output,
+        )
+
     model = sm.models.unet.build_unet(
         backbone=backbone,
         decoder_block=sm.models.unet.DecoderUpsamplingX2Block,
-        skip_connection_layers=encoder_features,
+        skip_connection_layers=encoder_features[5 - num_stages :],
         decoder_filters=decoder_filters,
         classes=1,
         activation='sigmoid',
-        n_upsample_blocks=len(decoder_filters),
+        n_upsample_blocks=num_stages,
         use_batchnorm=True,
     )
 
@@ -74,12 +81,31 @@ def unet(
     return updated_model
 
 
+def visualize_preds(images, labels, preds):
+    preds = np.transpose(preds > 0.5, [1, 0, 2, 3])
+    preds = np.reshape(preds, [preds.shape[0], -1, 1])
+
+    labels = np.transpose(labels, [1, 0, 2, 3])
+    labels = np.reshape(labels, [labels.shape[0], -1, 1])
+
+    img_pred = np.concatenate(
+        [labels * (1 - preds), preds * labels, preds * (1 - labels)], axis=-1
+    )
+    img = np.transpose(images, [1, 0, 2, 3])
+    img = np.reshape(img, [img.shape[0], -1, 3])
+
+    result_vis = np.concatenate([img, img_pred], axis=0)
+    result_vis = (result_vis * 255).astype(np.uint8)
+
+    return result_vis
+
+
 class VisualizePredsCallback(tf.keras.callbacks.Callback):
     def __init__(self, log_dir, data, period, **kwargs):
         super(VisualizePredsCallback, self).__init__(**kwargs)
         self.period = period
-        self.data = data
 
+        self.data = data
         self.writer = tf.summary.FileWriter(log_dir)
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -89,16 +115,36 @@ class VisualizePredsCallback(tf.keras.callbacks.Callback):
         if not epoch or epoch % self.period:
             return
 
-        preds = self.model.predict(self.data)
-        preds = np.transpose(preds, [1, 0, 2, 3])
-        preds = np.reshape(preds, [preds.shape[0], -1])
-        cv2.imwrite(
-            str(self.log_dir / f'epoch_{epoch}.png'), (preds * 255).astype(np.uint8)
+        sess = tf.keras.backend.get_session()
+        item = tf.compat.v1.data.make_one_shot_iterator(self.data).get_next()
+        images = []
+        labels = []
+        try:
+            while True:
+                item_result = sess.run(item)
+                images.append(item_result[0])
+                # store binary labels
+                labels.append(item_result[1])
+        except tf.errors.OutOfRangeError:
+            pass
+
+        images = np.concatenate(images, axis=0)
+        labels = np.concatenate(labels, axis=0)
+
+        preds = self.model.predict(images)
+
+        result_vis = visualize_preds(images=images, labels=labels, preds=preds)
+        Image.fromarray(result_vis).save(self.log_dir / f'epoch_{epoch}.png')
+
+
+class MeanIoUFromBinary(tf.keras.metrics.MeanIoU):
+    def __init__(self, **kwargs):
+        super(MeanIoUFromBinary, self).__init__(
+            num_classes=2, name='mean_io_u', **kwargs
         )
 
-
-def binary_iou_score(pred, true):
-    pred = tf.concat([1 - pred, pred], axis=-1)
-    true = tf.concat([1 - true, true], axis=-1)
-
-    return sm.metrics.iou_score(pred, true)
+    def update_state(self, y_true, y_pred, *args, **kwargs):
+        y_pred = tf.cast(y_pred > 0.5, tf.int32)
+        return super(MeanIoUFromBinary, self).update_state(
+            y_true, y_pred, *args, **kwargs
+        )
