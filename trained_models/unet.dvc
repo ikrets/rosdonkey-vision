@@ -1,45 +1,45 @@
-md5: f1f92b41cc465b4251f64a37d8dabdff
+md5: 6a60ccdf5ca11fc8585d59fd0936b6af
 cmd: python train.py --data data/birdeye --crop_size 48 --allowed_tags 60_fps home
-  --num_folds 5 --epochs 501 --num_stages 2 --decoder_filters_base 32 --alpha 0.35
-  --bn_momentum 0.9 --l2_regularization 1e-9 --contrast_delta 0.1 --brightness_delta
-  0.1 --lr_values 1e-6 5e-4 1e-3 5e-4 1e-4 --lr_boundaries 20 40 350 450 --batch_size
-  4 --visualize_preds_period 100 trained_models/unet
+  --num_folds 5 --epochs 801 --num_stages 4 --decoder_filters_base 16 --alpha 0.35
+  --bn_momentum 0.9 --l2_regularization 1e-11 --augment_strength 0.125 --lr_values
+  1e-6 5e-4 1e-3 5e-4 1e-4 --lr_boundaries 20 40 500 700 --batch_size 4 --visualize_preds_period
+  100 trained_models/unet
 wdir: ..
 deps:
 - md5: 94ed57b03d7f636e5ffec3432c4990aa.dir
   path: data/birdeye
 outs:
-- md5: c964950809ceab60950849cf564850b6.dir
+- md5: 57afcab39cc208f5d5c49a5afbb39b83.dir
   path: trained_models/unet/fold_0
   cache: true
   metric: false
   persist: false
-- md5: 86f3251fb20a2ca3fbc6055147321ac7.dir
+- md5: b55464208a5545f401f7bb2a04c6439b.dir
   path: trained_models/unet/fold_1
   cache: true
   metric: false
   persist: false
-- md5: cb000e9c00f945de4ec4a6c168a35b20.dir
+- md5: b062a22395e949706280bf2a4082cad4.dir
   path: trained_models/unet/fold_2
   cache: true
   metric: false
   persist: false
-- md5: 59ca834e2d72e6787c0b026fdead7dd6.dir
+- md5: 51a1c2c300e153629652e4f0c2c3edfc.dir
   path: trained_models/unet/fold_3
   cache: true
   metric: false
   persist: false
-- md5: 5cbc926453e3da47dad7ce360d214745.dir
+- md5: 36698f3d0ecd5d4ba04a5ed8b6228f12.dir
   path: trained_models/unet/fold_4
   cache: true
   metric: false
   persist: false
-- md5: 0d3e12e9b9defb06f760ab6427c6bebc.dir
+- md5: a9ab525905be0e02af1deea7b6c9a302.dir
   path: trained_models/unet/full_train
   cache: true
   metric: false
   persist: false
-- md5: d62e50e22a6f00986ee43691d38a0d94
+- md5: 0a761745298aee857269e9aa71a93082
   path: trained_models/unet/metric.json
   cache: true
   metric: true
