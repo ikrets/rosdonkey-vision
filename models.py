@@ -8,15 +8,6 @@ import math
 tfkl = tf.keras.layers
 
 sm.set_framework('tf.keras')
-old_upsampling = tf.keras.layers.UpSampling2D
-
-
-def upsampling_bilinear(*args, **kwargs):
-    kwargs['interpolation'] = 'bilinear'
-    return old_upsampling(*args, **kwargs)
-
-
-tf.keras.layers.UpSampling2D = upsampling_bilinear
 
 num_parallel_calls = 8
 
@@ -32,6 +23,16 @@ def unet(
     }
     for k, v in tfk_kwargs.items():
         setattr(sm.models.unet, k, v)
+
+    # monkey patch the UpSampling2D layer, so it selects bilinear interpolation
+    # edgetpu does not support nearest interpolation
+    old_upsampling = tf.keras.layers.UpSampling2D
+
+    def upsampling_bilinear(*args, **kwargs):
+        kwargs['interpolation'] = 'bilinear'
+        return old_upsampling(*args, **kwargs)
+
+    tf.keras.layers.UpSampling2D = upsampling_bilinear
 
     backbone = sm.Backbones.get_backbone(
         'mobilenetv2',
@@ -54,16 +55,27 @@ def unet(
             outputs=backbone.get_layer(name=encoder_features[4 - num_stages]).output,
         )
 
-    model = sm.models.unet.build_unet(
-        backbone=backbone,
-        decoder_block=sm.models.unet.DecoderUpsamplingX2Block,
-        skip_connection_layers=encoder_features[5 - num_stages :],
-        decoder_filters=decoder_filters,
-        classes=1,
+    skip_layers = [
+        backbone.get_layer(name=n).output for n in encoder_features[5 - num_stages :]
+    ]
+    skip_layers += [backbone.input]
+
+    x = backbone.output
+    for i in range(num_stages):
+        skip = skip_layers[i]
+        x = sm.models.unet.DecoderUpsamplingX2Block(
+            decoder_filters[i], stage=i, use_batchnorm=True
+        )(x, skip)
+
+    x = tfkl.Conv2D(
+        filters=1,
+        kernel_size=3,
+        padding='same',
+        use_bias=True,
         activation='sigmoid',
-        n_upsample_blocks=num_stages,
-        use_batchnorm=True,
-    )
+        name='final_conv',
+    )(x)
+    model = tf.keras.Model(inputs=backbone.input, outputs=x)
 
     for layer in model.layers:
         if isinstance(layer, tf.keras.layers.BatchNormalization):
