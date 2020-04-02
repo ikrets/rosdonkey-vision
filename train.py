@@ -9,6 +9,7 @@ import json
 
 from dataset import get_image_filenames, load
 from models import unet, MeanIoUFromBinary, VisualizePredsCallback
+from augment import color_jitter
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data', type=str)
@@ -23,8 +24,7 @@ parser.add_argument('--lr_values', type=float, nargs='+', required=True)
 parser.add_argument('--lr_boundaries', type=float, nargs='+', required=True)
 parser.add_argument('--batch_size', type=int, required=True)
 parser.add_argument('--visualize_preds_period', type=int, default=100)
-parser.add_argument('--brightness_delta', type=float, default=0.01)
-parser.add_argument('--contrast_delta', type=float, default=0.01)
+parser.add_argument('--augment_strength', type=float, required=True)
 parser.add_argument('--bn_momentum', type=float, default=0.9)
 parser.add_argument('--l2_regularization', type=float, default=0.0)
 parser.add_argument('--freeze_encoder', action='store_true')
@@ -46,7 +46,7 @@ def piecewise_linear(values, boundaries):
 
 
 @tf.function
-def augment(img, mask, crop_size, brightness_delta, contrast_delta):
+def augment(img, mask, crop_size, strength):
     random_crop_h = tf.random.uniform(
         [1], maxval=tf.shape(img)[0] - crop_size, dtype=tf.int32
     )[0]
@@ -69,8 +69,7 @@ def augment(img, mask, crop_size, brightness_delta, contrast_delta):
     img = tf.image.rot90(img, k=rot90)
     mask = tf.image.rot90(mask, k=rot90)
 
-    img = tf.image.random_brightness(img, max_delta=brightness_delta)
-    img = tf.image.random_contrast(img, 1 - contrast_delta, 1 + contrast_delta)
+    img = color_jitter(img, strength=strength, random_order=True)
 
     return img, mask
 
@@ -90,9 +89,7 @@ def train_and_eval(log_dir, train_filenames, val_filenames=None):
         load(train_filenames)
         .shuffle(shuffle_buffer_size)
         .map(
-            lambda img, mask: augment(
-                img, mask, args.crop_size, args.brightness_delta, args.contrast_delta
-            ),
+            lambda img, mask: augment(img, mask, args.crop_size, args.augment_strength),
             num_parallel_calls,
         )
         .repeat()
