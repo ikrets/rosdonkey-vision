@@ -110,6 +110,7 @@ if __name__ == '__main__':
 
     folds = Path(args.model_dir).glob('fold_*')
     fold_ious = []
+    fold_latencies = []
     for fold in folds:
         latency, iou = convert_evaluate_fold(fold, Path(args.output_dir))
         with (Path(args.output_dir) / fold.name / 'converted_metric.json').open(
@@ -120,8 +121,16 @@ if __name__ == '__main__':
             )
 
         fold_ious.append(iou)
+        fold_latencies.append(latency)
 
     with (Path(args.output_dir) / 'converted_metric.json').open('w') as fp:
-        json.dump({'val_mean_io_u': float(np.mean(fold_ious))}, fp, indent=4)
+        json.dump(
+            {
+                'val_mean_io_u': float(np.mean(fold_ious)),
+                'latency': float(np.mean(fold_latencies)),
+            },
+            fp,
+            indent=4,
+        )
 
     convert_evaluate_fold(Path(args.model_dir) / 'full_train', Path(args.output_dir))
