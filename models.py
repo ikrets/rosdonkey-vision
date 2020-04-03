@@ -97,12 +97,18 @@ def visualize_preds(images, labels, preds):
     preds = np.transpose(preds > 0.5, [1, 0, 2, 3])
     preds = np.reshape(preds, [preds.shape[0], -1, 1])
 
-    labels = np.transpose(labels, [1, 0, 2, 3])
-    labels = np.reshape(labels, [labels.shape[0], -1, 1])
+    if labels is not None:
+        labels = np.transpose(labels, [1, 0, 2, 3])
+        labels = np.reshape(labels, [labels.shape[0], -1, 1])
 
-    img_pred = np.concatenate(
-        [labels * (1 - preds), preds * labels, preds * (1 - labels)], axis=-1
-    )
+        img_pred = np.concatenate(
+            [labels * (1 - preds), preds * labels, preds * (1 - labels)], axis=-1
+        )
+    else:
+        img_pred = np.concatenate(
+            [np.zeros_like(preds), preds, np.zeros_like(preds)], axis=-1
+        )
+
     img = np.transpose(images, [1, 0, 2, 3])
     img = np.reshape(img, [img.shape[0], -1, 3])
 
