@@ -14,8 +14,9 @@ from models import MeanIoUFromBinary, visualize_preds
 
 
 class SegmentationEngine(BasicEngine):
-    def __init__(self, model_path):
+    def __init__(self, model_path, output_shape):
         BasicEngine.__init__(self, str(model_path))
+        self.output_shape = output_shape
 
     def segment(self, img):
         input_tensor_shape = self.get_input_tensor_shape()
@@ -23,12 +24,12 @@ class SegmentationEngine(BasicEngine):
 
         input_tensor = np.asarray(img).flatten()
         latency, result = self.run_inference(input_tensor)
-        result = result.reshape((height, width, -1))
+        result = result.reshape(self.output_shape)
 
         return latency, result
 
 
-def convert_evaluate_fold(fold_dir, output_dir):
+def convert_evaluate_fold(fold_dir, output_dir, input_shape):
     train_filenames = pd.read_csv(
         fold_dir / 'train_filenames.txt', squeeze=True, header=None
     )
@@ -45,8 +46,9 @@ def convert_evaluate_fold(fold_dir, output_dir):
         for image, _ in train_dataset:
             yield [image]
 
+    model = tf.keras.models.load_model(Path(fold_dir) / 'model.hdf5')
     converter = tf.lite.TFLiteConverter.from_keras_model_file(
-        Path(fold_dir) / 'model.hdf5', input_shapes={'input_1': [1, 64, 96, 3]},
+        Path(fold_dir) / 'model.hdf5', input_shapes={'input_1': [1, *input_shape]}
     )
     converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
@@ -67,7 +69,7 @@ def convert_evaluate_fold(fold_dir, output_dir):
 
     if val_filenames is not None:
         segmentation_engine = SegmentationEngine(
-            output_dir / fold_dir.name / 'converted_model_edgetpu.tflite'
+            output_dir / fold_dir.name / 'converted_model_edgetpu.tflite',
         )
         val_dataset = load([Path(f) for f in val_filenames]).batch(1)
 
@@ -102,6 +104,7 @@ def convert_evaluate_fold(fold_dir, output_dir):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--input_shape', type=int, nargs=2, required=True)
     parser.add_argument('model_dir', type=str)
     parser.add_argument('output_dir', type=str)
     args = parser.parse_args()
@@ -112,7 +115,9 @@ if __name__ == '__main__':
     fold_ious = []
     fold_latencies = []
     for fold in folds:
-        latency, iou = convert_evaluate_fold(fold, Path(args.output_dir))
+        latency, iou = convert_evaluate_fold(
+            fold, Path(args.output_dir), args.input_shape
+        )
         with (Path(args.output_dir) / fold.name / 'converted_metric.json').open(
             'w'
         ) as fp:
@@ -133,4 +138,6 @@ if __name__ == '__main__':
             indent=4,
         )
 
-    convert_evaluate_fold(Path(args.model_dir) / 'full_train', Path(args.output_dir))
+    convert_evaluate_fold(
+        Path(args.model_dir) / 'full_train', Path(args.output_dir), args.input_shape
+    )

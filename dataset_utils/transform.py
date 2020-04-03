@@ -50,7 +50,7 @@ class UndistortBirdeye:
             parameters.D.astype(np.float32),
             np.eye(3),
             nK,
-            input_shape,
+            tuple(input_shape),
             cv2.CV_16SC2,
         )
 
@@ -129,7 +129,7 @@ class UndistortBirdeye:
 def overlay_img_with_mask(img: np.array, mask: np.array, alpha: float = 0.5):
     overlayed = np.array(img)
     mask = np.asarray(mask)
-    
+
     overlayed[mask == 1] = (
         alpha * np.array([0, 255, 0]) + (1 - alpha) * overlayed[mask == 1]
     ).round()
