@@ -8,21 +8,20 @@ from sklearn.model_selection import train_test_split
 from io import BytesIO
 import argparse
 from pathlib import Path
-from tqdm import trange
+from tqdm import tqdm, trange
 
 from transform import (
     UndistortBirdeye,
     UndistortBirdeyeParameters,
     overlay_img_with_mask,
 )
+from utils import save_run_parameters
 
 
-def prepare_file_dataset(
-    folders, dataset_name, image_transformation, mask_transformation
+def prepare_supervised_dataset(
+    folder, dataset_name, image_transformation, mask_transformation
 ):
-    images = []
-    for folder in folders:
-        images.extend(glob(os.path.join(folder, 'images/*.png')))
+    images = list(glob(os.path.join(folder, 'images/*.png')))
 
     masks = [i.replace('images', 'masks') for i in images]
     os.makedirs(dataset_name, exist_ok=True)
@@ -52,6 +51,42 @@ def prepare_file_dataset(
         )
 
 
+def prepare_unsupervised_dataset(folder, output_path, image_transformation):
+    images = [f for f in Path(folder).glob('**/*.jpg')]
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    with tf.io.TFRecordWriter(
+        str(output_path / f'record_examples_{len(images)}.tfrecord')
+    ) as writer:
+        for i, image_path in enumerate(tqdm(images, desc='Processing images')):
+            img = np.array(Image.open(image_path))
+            img[:, -2:, :] = 0
+
+            img = image_transformation(img)
+            tag = Path(str(image_path).replace(folder, '').split('/')[0]).parts[0]
+
+            with BytesIO() as fp:
+                Image.fromarray(img).save(fp, format='png')
+                feature = {
+                    'img': tf.train.Feature(
+                        bytes_list=tf.train.BytesList(value=[fp.getvalue()])
+                    ),
+                    'name': tf.train.Feature(
+                        bytes_list=tf.train.BytesList(
+                            value=[image_path.name.encode('ascii')]
+                        )
+                    ),
+                    'tag': tf.train.Feature(
+                        bytes_list=tf.train.BytesList(value=[tag.encode('ascii')])
+                    ),
+                }
+                example = tf.train.Example(features=tf.train.Features(feature=feature))
+                writer.write(example.SerializeToString())
+
+            if i < 10:
+                Image.fromarray(img).save(output_path / f'example_{i}.png')
+
+
 def expand(img, target_height_ratio):
     if len(img.shape) == 2:
         img = img[:, :, np.newaxis]
@@ -67,7 +102,7 @@ def expand(img, target_height_ratio):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        'Create a undistorted, birdeye view dataset from labeled images.'
+        'Create a undistorted, birdeye view dataset from labeled or unlabeled images.'
     )
     parser.add_argument(
         '--undistort_birdeye_parameters',
@@ -92,9 +127,12 @@ if __name__ == '__main__':
         help='The target size of the birdeye view images.',
     )
     parser.add_argument(
-        'extracted_dataset',
-        type=str,
-        help='location of the extracted images with labels',
+        '--unsupervised_dataset',
+        action='store_true',
+        help='The dataset has images only, and will be written as a tfrecord',
+    )
+    parser.add_argument(
+        'input_dataset', type=str, help='location of the input dataset',
     )
     parser.add_argument(
         'output', type=str, help='the resulting dataset will be written here'
@@ -121,9 +159,16 @@ if __name__ == '__main__':
         resize(expand(img, height_ratio)), undistort_interpolation=cv2.INTER_LINEAR
     )
 
-    prepare_file_dataset(
-        [args.extracted_dataset],
-        args.output,
-        image_transformation=transformation,
-        mask_transformation=transformation,
-    )
+    save_run_parameters(Path(args.output), dict(vars(args)))
+
+    if not args.unsupervised_dataset:
+        prepare_supervised_dataset(
+            args.input_dataset,
+            args.output,
+            image_transformation=transformation,
+            mask_transformation=transformation,
+        )
+    else:
+        prepare_unsupervised_dataset(
+            args.input_dataset, Path(args.output), image_transformation=transformation
+        )

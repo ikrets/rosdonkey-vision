@@ -12,6 +12,7 @@ from pathlib import Path
 import subprocess
 
 from transform import overlay_img_with_mask
+from utils import save_run_parameters
 
 parser = argparse.ArgumentParser(
     description='Extract labeled images from the semantic segmentation editor.'
@@ -57,14 +58,7 @@ class_appearances = [0, 0]
 for n in ['images', 'masks', 'images_with_masks']:
     os.makedirs(os.path.join(output_dir, n), exist_ok=True)
 
-with (Path(output_dir) / 'parameters.json').open('w') as fp:
-    parameters = dict(vars(args))
-    parameters['commit'] = (
-        subprocess.run('git rev-parse HEAD', shell=True, stdout=subprocess.PIPE)
-        .stdout.decode('ascii')
-        .strip()
-    )
-    json.dump(parameters, fp, indent=4)
+save_run_parameters(Path(output_dir), dict(vars(args)))
 
 for item in tqdm(
     requests.get('http://localhost:3000/api/listing').json(),
