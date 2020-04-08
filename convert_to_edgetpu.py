@@ -47,8 +47,9 @@ def convert_evaluate_fold(fold_dir, output_dir, input_shape):
             yield [image]
 
     model = tf.keras.models.load_model(Path(fold_dir) / 'model.hdf5')
+    output_shape = model.predict(np.random.rand(1, *input_shape, 3)).shape[1:]
     converter = tf.lite.TFLiteConverter.from_keras_model_file(
-        Path(fold_dir) / 'model.hdf5', input_shapes={'input_1': [1, *input_shape]}
+        Path(fold_dir) / 'model.hdf5', input_shapes={'input_1': [1, *input_shape, 3]}
     )
     converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
@@ -69,7 +70,7 @@ def convert_evaluate_fold(fold_dir, output_dir, input_shape):
 
     if val_filenames is not None:
         segmentation_engine = SegmentationEngine(
-            output_dir / fold_dir.name / 'converted_model_edgetpu.tflite',
+            output_dir / fold_dir.name / 'converted_model_edgetpu.tflite', output_shape
         )
         val_dataset = load([Path(f) for f in val_filenames]).batch(1)
 
