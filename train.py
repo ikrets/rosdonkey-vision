@@ -9,7 +9,7 @@ import json
 
 from dataset import get_image_filenames, load
 from models import unet, MeanIoUFromBinary, VisualizePredsCallback
-from augment import color_jitter
+from simclr.data_util import color_jitter
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data', type=str)

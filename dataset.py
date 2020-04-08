@@ -1,6 +1,8 @@
 import cv2
 import tensorflow as tf
+import numpy as np
 from pathlib import Path
+import re
 from typing import Sequence
 
 num_parallel_calls = 8
@@ -34,3 +36,45 @@ def load(image_filenames: Sequence[Path]) -> tf.data.Dataset:
 
     dataset = dataset.map(process, num_parallel_calls)
     return dataset
+
+
+unsupervised_feature_description = {
+    'img': tf.io.FixedLenFeature([], tf.string),
+    'name': tf.io.FixedLenFeature([], tf.string),
+    'tag': tf.io.FixedLenFeature([], tf.string),
+}
+
+
+def load_unsupervised_tfrecords(tfrecord_path: Path, allowed_tags: Sequence[str]):
+    tfrecords = [str(f) for f in tfrecord_path.glob('**/*.tfrecord')]
+    dataset = tf.data.TFRecordDataset(tfrecords)
+    dataset = dataset.map(
+        lambda proto: tf.io.parse_single_example(
+            proto, unsupervised_feature_description
+        ),
+        num_parallel_calls,
+    )
+
+    @tf.function
+    def allowed_tag_present(item):
+        found = False
+        for allowed_tag in allowed_tags:
+            if tf.strings.regex_full_match(item['tag'], f'{allowed_tag}.*'):
+                found = True
+
+        return found
+
+    dataset = dataset.filter(allowed_tag_present)
+    num_examples = dataset.reduce(np.int64(0), lambda x, _: x + 1)
+    if tf.executing_eagerly():
+        num_examples = num_examples.numpy()
+    else:
+        sess = tf.compat.v1.keras.backend.get_session()
+        num_examples = sess.run(num_examples)
+
+    dataset = dataset.map(
+        lambda item: tf.cast(tf.image.decode_png(item['img']), tf.float32) / 255,
+        num_parallel_calls,
+    )
+
+    return dataset, num_examples
