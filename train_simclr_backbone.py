@@ -17,7 +17,7 @@ num_parallel_calls = 8
 
 def simclr_mobilenetv2(input_shape, alpha, last_layer, contrastive_head_features):
     mobilenetv2 = tf.keras.applications.MobileNetV2(
-        input_shape=input_shape, alpha=alpha, include_top=False, weights='imagenet'
+        input_shape=input_shape, alpha=alpha, include_top=False, weights=None
     )
 
     out = tfkl.Flatten()(mobilenetv2.get_layer(name=last_layer).output)

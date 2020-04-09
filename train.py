@@ -20,6 +20,7 @@ parser.add_argument('--epochs', type=int, required=True)
 parser.add_argument('--decoder_filters_base', type=int, required=True)
 parser.add_argument('--num_stages', type=int, choices=[2, 3, 4, 5], required=True)
 parser.add_argument('--alpha', choices=[0.35, 0.5, 0.75, 1], type=float)
+parser.add_argument('--load_backbone', type=str)
 parser.add_argument('--lr_values', type=float, nargs='+', required=True)
 parser.add_argument('--lr_boundaries', type=float, nargs='+', required=True)
 parser.add_argument('--batch_size', type=int, required=True)
@@ -64,10 +65,6 @@ def augment(img, mask, crop_size, strength):
     hflip = tf.random.uniform([1], maxval=2, dtype=tf.int32)[0]
     if hflip == 1:
         img, mask = tf.image.flip_left_right(img), tf.image.flip_left_right(mask)
-
-    rot90 = tf.random.uniform([1], maxval=4, dtype=tf.int32)[0]
-    img = tf.image.rot90(img, k=rot90)
-    mask = tf.image.rot90(mask, k=rot90)
 
     img = color_jitter(img, strength=strength, random_order=True)
 
@@ -128,8 +125,18 @@ def train_and_eval(log_dir, train_filenames, val_filenames=None):
     decoder_filters = [
         args.decoder_filters_base * (2 ** i) for i in range(0, args.num_stages)
     ][::-1]
+
+    if args.load_backbone:
+        backbone = tf.keras.models.load_model(args.load_backbone)
+    else:
+        backbone = tf.keras.applications.MobileNetV2(
+            input_shape=[None, None, 3],
+            weights='imagenet',
+            include_top=False,
+            alpha=args.alpha,
+        )
     model = unet(
-        input_shape=[None, None, 3],
+        backbone,
         decoder_filters=decoder_filters,
         alpha=args.alpha,
         bn_momentum=args.bn_momentum,

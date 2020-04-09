@@ -1,0 +1,23 @@
+md5: 79efa8da061bd07e3b024515b7e0934e
+cmd: python train_simclr_backbone.py --data data/unsupervised_birdeye --batch_size
+  1024 --crop_size 48 --jitter_strength 0.2 --learning_rate 0.05 --epochs 7200 trained_models/simclr_backbone
+wdir: ..
+deps:
+- md5: 7a3104b01e36f00885dd772aef798e92.dir
+  path: data/unsupervised_birdeye
+outs:
+- md5: 74b38518c6f311c4abef9fdd3f45de01
+  path: trained_models/simclr_backbone/parameters.json
+  cache: true
+  metric: false
+  persist: false
+- md5: c3d7f2b501501934197da6091a1a644c
+  path: trained_models/simclr_backbone/model.hdf5
+  cache: true
+  metric: false
+  persist: false
+- md5: 38786f42200083ea8deb96c769e24b33
+  path: trained_models/simclr_backbone/metric.json
+  cache: true
+  metric: true
+  persist: false
