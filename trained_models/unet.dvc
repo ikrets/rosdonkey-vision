@@ -1,4 +1,4 @@
-md5: 6a60ccdf5ca11fc8585d59fd0936b6af
+md5: 6ff1752d30c1359b569f6152caeaeb4d
 cmd: python train.py --data data/birdeye --crop_size 48 --allowed_tags 60_fps home
   --num_folds 5 --epochs 801 --num_stages 4 --decoder_filters_base 16 --alpha 0.35
   --bn_momentum 0.9 --l2_regularization 1e-11 --augment_strength 0.125 --lr_values
@@ -6,40 +6,40 @@ cmd: python train.py --data data/birdeye --crop_size 48 --allowed_tags 60_fps ho
   100 trained_models/unet
 wdir: ..
 deps:
-- md5: 94ed57b03d7f636e5ffec3432c4990aa.dir
+- md5: 452c18c666c73e13f6dabc33b48dc18c.dir
   path: data/birdeye
 outs:
-- md5: 57afcab39cc208f5d5c49a5afbb39b83.dir
+- md5: 3b2fef015415717cf4490ad679849574.dir
   path: trained_models/unet/fold_0
   cache: true
   metric: false
   persist: false
-- md5: b55464208a5545f401f7bb2a04c6439b.dir
+- md5: abda3adfa0143044b978ce4d889558eb.dir
   path: trained_models/unet/fold_1
   cache: true
   metric: false
   persist: false
-- md5: b062a22395e949706280bf2a4082cad4.dir
+- md5: 263fe5319f1e6dcc4a4919cf28fbdc12.dir
   path: trained_models/unet/fold_2
   cache: true
   metric: false
   persist: false
-- md5: 51a1c2c300e153629652e4f0c2c3edfc.dir
+- md5: 4b52d2c3f98f32138203ea778701a3ce.dir
   path: trained_models/unet/fold_3
   cache: true
   metric: false
   persist: false
-- md5: 36698f3d0ecd5d4ba04a5ed8b6228f12.dir
+- md5: 58cd70f52c95cecae5d3cf44fd40ac9a.dir
   path: trained_models/unet/fold_4
   cache: true
   metric: false
   persist: false
-- md5: a9ab525905be0e02af1deea7b6c9a302.dir
+- md5: a035c8d754ec1b967c86491d2b44f4e1.dir
   path: trained_models/unet/full_train
   cache: true
   metric: false
   persist: false
-- md5: 0a761745298aee857269e9aa71a93082
+- md5: 4bdd5f3ab9a4a39d0297b841a8ad3de9
   path: trained_models/unet/metric.json
   cache: true
   metric: true
